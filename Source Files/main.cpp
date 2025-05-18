@@ -41,6 +41,52 @@ std::vector<std::vector<glm::vec3>> curvesControlPoints = {
     }
 };
 
+// temporary cubus
+float cubeVertices[] = {
+    // Positions       
+    -0.05f, -0.05f, -0.05f,
+     0.05f, -0.05f, -0.05f,
+     0.05f,  0.05f, -0.05f,
+     0.05f,  0.05f, -0.05f,
+    -0.05f,  0.05f, -0.05f,
+    -0.05f, -0.05f, -0.05f,
+
+    -0.05f, -0.05f,  0.05f,
+     0.05f, -0.05f,  0.05f,
+     0.05f,  0.05f,  0.05f,
+     0.05f,  0.05f,  0.05f,
+    -0.05f,  0.05f,  0.05f,
+    -0.05f, -0.05f,  0.05f,
+
+    -0.05f,  0.05f,  0.05f,
+    -0.05f,  0.05f, -0.05f,
+    -0.05f, -0.05f, -0.05f,
+    -0.05f, -0.05f, -0.05f,
+    -0.05f, -0.05f,  0.05f,
+    -0.05f,  0.05f,  0.05f,
+
+     0.05f,  0.05f,  0.05f,
+     0.05f,  0.05f, -0.05f,
+     0.05f, -0.05f, -0.05f,
+     0.05f, -0.05f, -0.05f,
+     0.05f, -0.05f,  0.05f,
+     0.05f,  0.05f,  0.05f,
+
+    -0.05f, -0.05f, -0.05f,
+     0.05f, -0.05f, -0.05f,
+     0.05f, -0.05f,  0.05f,
+     0.05f, -0.05f,  0.05f,
+    -0.05f, -0.05f,  0.05f,
+    -0.05f, -0.05f, -0.05f,
+
+    -0.05f,  0.05f, -0.05f,
+     0.05f,  0.05f, -0.05f,
+     0.05f,  0.05f,  0.05f,
+     0.05f,  0.05f,  0.05f,
+    -0.05f,  0.05f,  0.05f,
+    -0.05f,  0.05f, -0.05f
+};
+
 // Camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -77,6 +123,16 @@ int main() {
     curveVAO.Unbind();
     curveVBO.Unbind();
     //-------------------------------------------------------------------------------------------------------
+
+    //-------------------------------- Create temp cube VAO, VBO and shader ---------------------------------
+    Shader cubeShader(RESOURCE_PATH "shaders/cube.vert", RESOURCE_PATH "shaders/cube.frag");
+    VAO cubeVAO;
+    cubeVAO.Bind();
+    VBO cubeVBO(cubeVertices, sizeof(cubeVertices));
+    cubeVAO.LinkVBO(cubeVBO, 0);
+    cubeVAO.Unbind();
+    cubeVBO.Unbind();
+    //-------------------------------------------------------------------------------------------------------
     
 	//-------------------------------------------- Capture mouse --------------------------------------------
     glfwSetCursorPosCallback(window, mouse_callback);
@@ -84,6 +140,9 @@ int main() {
     //-------------------------------------------------------------------------------------------------------
 
     //--------------------------------------------- Render loop ---------------------------------------------
+    // Animation variables
+    float speed = 0.5f;
+    float currentDistance = 0.0f;
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -93,18 +152,19 @@ int main() {
         // Screen background color
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        // Camera/view transformation
+		glm::mat4 view = camera.GetViewMatrix();
 
 		// Process input
         camera.processInput(window, deltaTime);
 
+		// ---------------------------------- Draw the curve ----------------------------------
 		// Activate shader
         curveShader.Activate();
-		glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		curveShader.setMat4("projection", projection);
-        // Camera/view transformation
-		glm::mat4 view = camera.GetViewMatrix();
 		curveShader.setMat4("view", view);
-
 		// Bind the VAO and draw the bezier curves
         curveVAO.Bind();
         // Draw each curve
@@ -114,7 +174,50 @@ int main() {
             offset += curve.getCurvePoints().size();
         }
         curveVAO.Unbind();
+        // ------------------------------------------------------------------------------------
 
+		// ---------------------------------- Draw the cube ----------------------------------
+        // Update position along path
+        currentDistance += speed * deltaTime;
+        if (currentDistance > path.getTotalLength()) {
+            currentDistance -= path.getTotalLength();
+        }
+
+        // Get current and next positions for orientation
+        glm::vec3 objectPosition = path.Evaluate(currentDistance);
+        glm::vec3 nextPosition = path.Evaluate(currentDistance + 0.01f);
+        glm::vec3 tangent = glm::normalize(nextPosition - objectPosition);
+
+        // Calculate rotation to align with tangent
+        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::vec3 right = glm::normalize(glm::cross(up, tangent));
+        up = glm::normalize(glm::cross(tangent, right));
+
+        // Create model matrix for the object
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, objectPosition);
+
+        // Create rotation matrix to align with tangent
+        glm::mat4 rotation;
+        rotation[0] = glm::vec4(right, 0.0f);
+        rotation[1] = glm::vec4(up, 0.0f);
+        rotation[2] = glm::vec4(tangent, 0.0f);
+        rotation[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+        model = model * rotation;
+
+		// Activate shader
+		cubeShader.Activate();
+        cubeShader.setMat4("model", model);
+		cubeShader.setMat4("projection", projection);
+		cubeShader.setMat4("view", view);
+		// Bind the VAO and draw the cube
+		cubeVAO.Bind();
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		cubeVAO.Unbind();
+		// ------------------------------------------------------------------------------------
+
+		// Swap the buffers
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -123,6 +226,9 @@ int main() {
     //----------------------------------------------- Clean up ----------------------------------------------
     curveVAO.Delete();
     curveVBO.Delete();
+
+    cubeVAO.Delete();
+    cubeVBO.Delete();
 
 
     glfwDestroyWindow(window);
