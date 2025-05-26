@@ -1,6 +1,8 @@
 #include <iostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include "shaderClass.h"
 #include "bezierCurve.h"
@@ -133,7 +135,103 @@ int main() {
     cubeVAO.Unbind();
     cubeVBO.Unbind();
     //-------------------------------------------------------------------------------------------------------
-    
+
+	//--------------------------------------------- Framebuffer ---------------------------------------------
+    GLuint fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    GLuint texColorBuffer;
+    glGenTextures(1, &texColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+
+    GLuint rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    //-------------------------------------------------------------------------------------------------------
+
+	//--------------------------------------------- Quad VAO, VBO -------------------------------------------
+    float quadVertices[] = {
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
+    };
+
+    GLuint quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(0);
+    //-------------------------------------------------------------------------------------------------------
+
+	//----------------------------------------- Convolution shader ------------------------------------------
+    float gaussian[9] = {
+    1.0 / 16, 2.0 / 16, 1.0 / 16,
+    2.0 / 16, 4.0 / 16, 2.0 / 16,
+    1.0 / 16, 2.0 / 16, 1.0 / 16
+    };
+
+    float laplacian[9] = {
+         0,  1,  0,
+         1, -4,  1,
+         0,  1,  0
+    };
+
+	Shader convolutionShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
+    convolutionShader.Activate();
+
+    for (int i = 0; i < 9; i++)
+        glUniform1f(glGetUniformLocation(convolutionShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), gaussian[i]);
+
+    glUniform1f(glGetUniformLocation(convolutionShader.ID, "offset"), 1.0f / SCR_WIDTH);
+    //-------------------------------------------------------------------------------------------------------
+
+	//----------------------------------------- Load border texture -----------------------------------------
+    unsigned int borderTex;
+    glGenTextures(1, &borderTex);
+    glBindTexture(GL_TEXTURE_2D, borderTex);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int width, height, nrChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load(RESOURCE_PATH "border.jpg", &width, &height, &nrChannels, 0);
+    if (data) {
+        GLenum format = (nrChannels == 3) ? GL_RGB : GL_RGBA;
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else {
+        std::cout << "Failed to load border.jpg" << std::endl;
+    }
+    stbi_image_free(data);
+    Shader chromakeyingShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/chromakeying.frag");
+    //-------------------------------------------------------------------------------------------------------
+
 	//-------------------------------------------- Capture mouse --------------------------------------------
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -159,6 +257,10 @@ int main() {
 
 		// Process input
         camera.processInput(window, deltaTime);
+
+		// Bind the framebuffer for offscreen rendering
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// ---------------------------------- Draw the curve ----------------------------------
 		// Activate shader
@@ -216,6 +318,30 @@ int main() {
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		cubeVAO.Unbind();
 		// ------------------------------------------------------------------------------------
+
+		// ---------------------------------- Post Processing ---------------------------------
+        // convolution
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        convolutionShader.Activate();
+        glBindVertexArray(quadVAO);
+        glDisable(GL_DEPTH_TEST);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glUniform1i(glGetUniformLocation(convolutionShader.ID, "screenTexture"), 0);
+
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		// chromakeying
+        chromakeyingShader.Activate();
+        glBindVertexArray(quadVAO);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, borderTex);
+        glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
+
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // ------------------------------------------------------------------------------------
 
 		// Swap the buffers
         glfwSwapBuffers(window);
