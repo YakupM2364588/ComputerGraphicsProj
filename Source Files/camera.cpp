@@ -9,7 +9,9 @@ Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
 	Pitch = pitch;
 	updateCameraVectors();
 }
-
+glm::vec3 Camera::getPosition() {
+    return Position;
+}
 void Camera::processInput(GLFWwindow* window, float dt)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
