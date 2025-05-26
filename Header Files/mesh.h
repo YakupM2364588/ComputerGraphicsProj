@@ -12,7 +12,7 @@
 class Mesh {
     public:
     Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures);
-    void Draw(Shader& shader);
+    void Draw(Shader& shader) const;
 
     void Init();
 

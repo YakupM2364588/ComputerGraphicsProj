@@ -27,7 +27,7 @@ Mesh::Mesh(const std::vector<Vertex>& vertices,
     m_elementBufferObject.Unbind();
 }
 
-void Mesh::Draw(const Shader& shader)
+void Mesh::Draw(const Shader& shader) const
 {
     if (m_indices.empty()) {
         std::cerr << "Empty mesh";
