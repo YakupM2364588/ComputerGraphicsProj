@@ -124,16 +124,35 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
 
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // second fbo for intermediate rendering
+    GLuint intermediateFBO;
+    glGenFramebuffers(1, &intermediateFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+
+    GLuint intermediateTex;
+    glGenTextures(1, &intermediateTex);
+    glBindTexture(GL_TEXTURE_2D, intermediateTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, intermediateTex, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Renderbuffer for depth and stencil
     GLuint rbo;
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     //-------------------------------------------------------------------------------------------------------
 
     //--------------------------------------------- Quad VAO, VBO -------------------------------------------
@@ -182,18 +201,30 @@ int main() {
 
     //----------------------------------------- Convolution shader ------------------------------------------
     float gaussian[9] = {
-        1.0 / 16, 2.0 / 16, 1.0 / 16,
-        2.0 / 16, 4.0 / 16, 2.0 / 16,
-        1.0 / 16, 2.0 / 16, 1.0 / 16
+    1.0 / 16, 2.0 / 16, 1.0 / 16,
+    2.0 / 16, 4.0 / 16, 2.0 / 16,
+    1.0 / 16, 2.0 / 16, 1.0 / 16
     };
 
-    Shader convolutionShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
-    convolutionShader.Activate();
+    float laplacian[9] = {
+         1,  1,  1,
+         1, -7,  1,
+         1,  1,  1
+    };
 
+    Shader blurShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
+    Shader edgeShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
+    // Gaussian kernel to blurShader
+    blurShader.Activate();
     for (int i = 0; i < 9; i++)
-        glUniform1f(glGetUniformLocation(convolutionShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), gaussian[i]);
+        glUniform1f(glGetUniformLocation(blurShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), gaussian[i]);
+    glUniform1f(glGetUniformLocation(blurShader.ID, "offset"), 1.0f / SCR_WIDTH);
 
-    glUniform1f(glGetUniformLocation(convolutionShader.ID, "offset"), 1.0f / SCR_WIDTH);
+    // Laplacian kernel to edgeShader
+    edgeShader.Activate();
+    for (int i = 0; i < 9; i++)
+        glUniform1f(glGetUniformLocation(edgeShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), laplacian[i]);
+    glUniform1f(glGetUniformLocation(edgeShader.ID, "offset"), 1.0f / SCR_WIDTH);
     //-------------------------------------------------------------------------------------------------------
 
     //----------------------------------------- Load border texture -----------------------------------------
@@ -291,29 +322,42 @@ int main() {
         }
 
         // STEP 2: Post-processing - render to screen
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDisable(GL_DEPTH_TEST);
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        // Gaussian Blur
+        glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Apply convolution
-        convolutionShader.Activate();
+        blurShader.Activate();
         glBindVertexArray(quadVAO);
+        glDisable(GL_DEPTH_TEST);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-        glUniform1i(glGetUniformLocation(convolutionShader.ID, "screenTexture"), 0);
+        //glUniform1i(glGetUniformLocation(blurShader.ID, "screenTexture"), 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // Apply chromakeying
+        // Laplacian Edge Detection
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        edgeShader.Activate();
+        glBindVertexArray(quadVAO);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, intermediateTex);
+        //glUniform1i(glGetUniformLocation(edgeShader.ID, "screenTexture"), 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Chromakey Overlay
         chromakeyingShader.Activate();
         glBindVertexArray(quadVAO);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, borderTex);
-        glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
+        //glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Render button if visible
-            renderButton();
+        renderButton();
 
         glfwSwapBuffers(g_window);
         glfwPollEvents();
