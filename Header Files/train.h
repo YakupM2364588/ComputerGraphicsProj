@@ -11,14 +11,14 @@
 class Train {
 public:
     Train(const std::string& modelPath, const std::string& mtlPath);
-    void Update(float currentTime, BezierCurvePath& path);
+    void Update(float deltaTime, BezierCurvePath& path);
     void Draw(Shader& shader);
-    void SetTimeOffset(float offset);
+
+    Model model;
+    float speed = 5.0f;
 
 private:
-    Model model;
-    float timeOffset = 0.0f;
-    const float speed = 5.0f;
+    float accumulatedTime = 0.0f; //t 
 };
 
 #endif //TRAIN_H
