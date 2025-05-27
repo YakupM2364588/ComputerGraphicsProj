@@ -22,6 +22,22 @@ set(LIBS ${LIBS} GLAD)
 
 include_directories(${CMAKE_SOURCE_DIR}/includes)
 include_directories("${CMAKE_SOURCE_DIR}/Header Files")
-add_executable(opengl_project "Source Files/main.cpp" "Source Files/shaderClass.cpp" "Header Files/stb_image.h" "Source Files/EBO.cpp" "Source Files/VBO.cpp" "Source Files/VAO.cpp" "Source Files/bezierCurve.cpp" "Source Files/bezierCurvesPath.cpp" "Source Files/camera.cpp")
+add_executable(opengl_project
+        "Source Files/main.cpp"
+        "Source Files/shaderClass.cpp"
+        "Source Files/EBO.cpp"
+        "Source Files/VBO.cpp"
+        "Source Files/VAO.cpp"
+        "Source Files/bezierCurve.cpp"
+        "Source Files/bezierCurvesPath.cpp"
+        "Source Files/camera.cpp"
+        "Source Files/light.cpp"
+        "Source Files/mesh.cpp"
+        "Source Files/model.cpp"
+        "Source Files/railway.cpp"
+        "Source Files/texture.cpp"
+        "Source Files/train.cpp"
+        "Source Files/tiny_obj_loader.cpp"
+)
 target_link_libraries(opengl_project ${LIBS})
 target_compile_definitions(opengl_project PRIVATE RESOURCE_PATH="${CMAKE_SOURCE_DIR}/Resource Files/")
