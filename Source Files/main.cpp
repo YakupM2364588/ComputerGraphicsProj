@@ -17,11 +17,26 @@
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void renderButton();
+bool isPointInButton(double x, double y);
+bool trainStopped = false;
 //---------------------------------------------- Variables ----------------------------------------------
 // Window dimensions
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+
+// Train speed control
+float normalSpeed = 5.0f;
+
+// Button properties
+struct Button {
+    float x = 50.0f;      // Button position from left
+    float y = 50.0f;      // Button position from bottom
+    float width = 150.0f;
+    float height = 40.0f;
+    std::string text = "CONTINUE";
+} speedButton;
 
 // Control points for the bezier curves
 std::vector<std::vector<glm::vec3>> curvesControlPoints = {
@@ -45,51 +60,7 @@ std::vector<std::vector<glm::vec3>> curvesControlPoints = {
     }
 };
 
-// temporary cubus
-float cubeVertices[] = {
-    // Positions
-    -0.05f, -0.05f, -0.05f,
-     0.05f, -0.05f, -0.05f,
-     0.05f,  0.05f, -0.05f,
-     0.05f,  0.05f, -0.05f,
-    -0.05f,  0.05f, -0.05f,
-    -0.05f, -0.05f, -0.05f,
-
-    -0.05f, -0.05f,  0.05f,
-     0.05f, -0.05f,  0.05f,
-     0.05f,  0.05f,  0.05f,
-     0.05f,  0.05f,  0.05f,
-    -0.05f,  0.05f,  0.05f,
-    -0.05f, -0.05f,  0.05f,
-
-    -0.05f,  0.05f,  0.05f,
-    -0.05f,  0.05f, -0.05f,
-    -0.05f, -0.05f, -0.05f,
-    -0.05f, -0.05f, -0.05f,
-    -0.05f, -0.05f,  0.05f,
-    -0.05f,  0.05f,  0.05f,
-
-     0.05f,  0.05f,  0.05f,
-     0.05f,  0.05f, -0.05f,
-     0.05f, -0.05f, -0.05f,
-     0.05f, -0.05f, -0.05f,
-     0.05f, -0.05f,  0.05f,
-     0.05f,  0.05f,  0.05f,
-
-    -0.05f, -0.05f, -0.05f,
-     0.05f, -0.05f, -0.05f,
-     0.05f, -0.05f,  0.05f,
-     0.05f, -0.05f,  0.05f,
-    -0.05f, -0.05f,  0.05f,
-    -0.05f, -0.05f, -0.05f,
-
-    -0.05f,  0.05f, -0.05f,
-     0.05f,  0.05f, -0.05f,
-     0.05f,  0.05f,  0.05f,
-     0.05f,  0.05f,  0.05f,
-    -0.05f,  0.05f,  0.05f,
-    -0.05f,  0.05f, -0.05f
-};
+// Global variables
 Railway* g_railway = nullptr;
 Train* g_train = nullptr;
 glm::mat4 g_projectionMatrix;
@@ -97,6 +68,7 @@ int g_windowWidth = 800;
 int g_windowHeight = 600;
 std::vector<Light> g_lights;
 GLFWwindow* g_window;
+
 // Camera
 Camera g_camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -106,6 +78,10 @@ bool firstMouse = true;
 // Timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+// GUI rendering variables
+GLuint buttonVAO, buttonVBO;
+Shader* buttonShader = nullptr;
 //-------------------------------------------------------------------------------------------------------
 
 int main() {
@@ -115,7 +91,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     //---------------------------------------- Create render Window ----------------------------------------
-    GLFWwindow* g_window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Computer Graphics & Visual Computing Project", NULL, NULL);
+    g_window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Computer Graphics & Visual Computing Project", NULL, NULL);
     glfwMakeContextCurrent(g_window);
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         throw std::runtime_error("Failed to initialize GLAD!");
@@ -124,12 +100,14 @@ int main() {
     gladLoadGL();
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     glEnable(GL_DEPTH_TEST);
+
+    // Set callbacks
+    glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(g_window, mouse_callback);
+    glfwSetMouseButtonCallback(g_window, mouse_button_callback);
     //-------------------------------------------------------------------------------------------------------
 
-
-    //-------------------------------------------------------------------------------------------------------
-
-	//--------------------------------------------- Framebuffer ---------------------------------------------
+    //--------------------------------------------- Framebuffer ---------------------------------------------
     GLuint fbo;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -142,38 +120,19 @@ int main() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // second fbo for intermediate rendering
-    GLuint intermediateFBO;
-    glGenFramebuffers(1, &intermediateFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-
-    GLuint intermediateTex;
-    glGenTextures(1, &intermediateTex);
-    glBindTexture(GL_TEXTURE_2D, intermediateTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, intermediateTex, 0);
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Renderbuffer for depth and stencil
     GLuint rbo;
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     //-------------------------------------------------------------------------------------------------------
 
-	//--------------------------------------------- Quad VAO, VBO -------------------------------------------
+    //--------------------------------------------- Quad VAO, VBO -------------------------------------------
     float quadVertices[] = {
         -1.0f,  1.0f,  0.0f, 1.0f,
         -1.0f, -1.0f,  0.0f, 0.0f,
@@ -195,37 +154,45 @@ int main() {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
+
+    // Setup button rendering
+    float buttonVertices[] = {
+        0.0f, 1.0f,  // Top left
+        0.0f, 0.0f,  // Bottom left
+        1.0f, 0.0f,  // Bottom right
+
+        0.0f, 1.0f,  // Top left
+        1.0f, 0.0f,  // Bottom right
+        1.0f, 1.0f   // Top right
+    };
+
+    glGenVertexArrays(1, &buttonVAO);
+    glGenBuffers(1, &buttonVBO);
+    glBindVertexArray(buttonVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, buttonVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(buttonVertices), buttonVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glBindVertexArray(0);
     //-------------------------------------------------------------------------------------------------------
 
-	//----------------------------------------- Convolution shader ------------------------------------------
+    //----------------------------------------- Convolution shader ------------------------------------------
     float gaussian[9] = {
-    1.0 / 16, 2.0 / 16, 1.0 / 16,
-    2.0 / 16, 4.0 / 16, 2.0 / 16,
-    1.0 / 16, 2.0 / 16, 1.0 / 16
+        1.0 / 16, 2.0 / 16, 1.0 / 16,
+        2.0 / 16, 4.0 / 16, 2.0 / 16,
+        1.0 / 16, 2.0 / 16, 1.0 / 16
     };
 
-    float laplacian[9] = {
-         1,  1,  1,
-         1, -7,  1,
-         1,  1,  1
-    };
+    Shader convolutionShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
+    convolutionShader.Activate();
 
-    Shader blurShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
-    Shader edgeShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
-    // Gaussian kernel to blurShader
-    blurShader.Activate();
     for (int i = 0; i < 9; i++)
-        glUniform1f(glGetUniformLocation(blurShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), gaussian[i]);
-    glUniform1f(glGetUniformLocation(blurShader.ID, "offset"), 1.0f / SCR_WIDTH);
+        glUniform1f(glGetUniformLocation(convolutionShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), gaussian[i]);
 
-    // Laplacian kernel to edgeShader
-    edgeShader.Activate();
-    for (int i = 0; i < 9; i++)
-        glUniform1f(glGetUniformLocation(edgeShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), laplacian[i]);
-    glUniform1f(glGetUniformLocation(edgeShader.ID, "offset"), 1.0f / SCR_WIDTH);
+    glUniform1f(glGetUniformLocation(convolutionShader.ID, "offset"), 1.0f / SCR_WIDTH);
     //-------------------------------------------------------------------------------------------------------
 
-	//----------------------------------------- Load border texture -----------------------------------------
+    //----------------------------------------- Load border texture -----------------------------------------
     unsigned int borderTex;
     glGenTextures(1, &borderTex);
     glBindTexture(GL_TEXTURE_2D, borderTex);
@@ -247,10 +214,11 @@ int main() {
         std::cout << "Failed to load border.jpg" << std::endl;
     }
     stbi_image_free(data);
-    Shader chromakeyingShader( RESOURCE_PATH"shaders/convolution.vert",  RESOURCE_PATH"shaders/chromakeying.frag");
+    Shader chromakeyingShader(RESOURCE_PATH"shaders/convolution.vert", RESOURCE_PATH"shaders/chromakeying.frag");
     //-------------------------------------------------------------------------------------------------------
 
-	g_railway = new Railway(RESOURCE_PATH"models/rail.obj", RESOURCE_PATH"models");
+    // Initialize objects
+    g_railway = new Railway(RESOURCE_PATH"models/rail.obj", RESOURCE_PATH"models");
     g_train = new Train(RESOURCE_PATH"models/train.obj", RESOURCE_PATH"models");
 
     g_lights = {
@@ -265,105 +233,133 @@ int main() {
     Shader mainShader(RESOURCE_PATH"shaders/area.vert", RESOURCE_PATH"shaders/area.frag");
     Shader lightShader(RESOURCE_PATH"shaders/sun.vert", RESOURCE_PATH"shaders/sun.frag");
 
-    glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(g_window, mouse_callback);
-    glfwSetMouseButtonCallback(g_window, mouse_button_callback);
+    // Create button shader (simple colored rectangle)
+    buttonShader = new Shader(RESOURCE_PATH"shaders/button.vert", RESOURCE_PATH"shaders/button.frag");
 
     //--------------------------------------------- Render loop ---------------------------------------------
-    // Animation variables
-    float speed = 0.5f;
-    float currentDistance = 0.0f;
-    // Inside your render loop, replace the current rendering section with:
+    while (!glfwWindowShouldClose(g_window))
+    {
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-while (!glfwWindowShouldClose(g_window))
-{
-    float currentFrame = static_cast<float>(glfwGetTime());
-    deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+        g_projectionMatrix = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = g_camera.GetViewMatrix();
 
-    g_projectionMatrix = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = g_camera.GetViewMatrix();
+        // Process input
+        g_camera.processInput(g_window, deltaTime);
 
-    // Process input
-    g_camera.processInput(g_window, deltaTime);
-    g_train->Update(currentFrame, g_railway->GetPath());
+        // Update train with current speed
+        g_train->Update(deltaTime, g_railway->GetPath());
 
-    // STEP 1: Render scene to framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // STEP 1: Render scene to framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glEnable(GL_DEPTH_TEST);
+        glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Main shader rendering
-    mainShader.Activate();
-    mainShader.setMat4("projection", g_projectionMatrix);
-    mainShader.setMat4("view", g_camera.GetViewMatrix());
-    mainShader.setVec3("viewPos", g_camera.getPosition());
-    mainShader.setFloat("shininess", 32.0f);
+        // Main shader rendering
+        mainShader.Activate();
+        mainShader.setMat4("projection", g_projectionMatrix);
+        mainShader.setMat4("view", g_camera.GetViewMatrix());
+        mainShader.setVec3("viewPos", g_camera.getPosition());
+        mainShader.setFloat("shininess", 32.0f);
 
-    // Configure lights
-    for (size_t i = 0; i < g_lights.size(); ++i) {
-        g_lights[i].ConfigureShader(mainShader, static_cast<int>(i));
+        // Configure lights
+        for (size_t i = 0; i < g_lights.size(); ++i) {
+            g_lights[i].ConfigureShader(mainShader, static_cast<int>(i));
+        }
+
+        // Draw objects
+        g_railway->Draw(mainShader);
+        g_train->Draw(mainShader);
+
+        // Light sources
+        lightShader.Activate();
+        lightShader.setMat4("projection", g_projectionMatrix);
+        lightShader.setMat4("view", g_camera.GetViewMatrix());
+        for (auto& light : g_lights) {
+            lightShader.setVec3("lightColor", light.color);
+            light.Draw(lightShader);
+        }
+
+        // STEP 2: Post-processing - render to screen
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // Apply convolution
+        convolutionShader.Activate();
+        glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glUniform1i(glGetUniformLocation(convolutionShader.ID, "screenTexture"), 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Apply chromakeying
+        chromakeyingShader.Activate();
+        glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, borderTex);
+        glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Render button if visible
+            renderButton();
+
+        glfwSwapBuffers(g_window);
+        glfwPollEvents();
     }
 
-    // Draw objects
-    g_railway->Draw(mainShader);
-    g_train->Draw(mainShader);
-
-    // Light sources
-    lightShader.Activate();
-    lightShader.setMat4("projection", g_projectionMatrix);
-    lightShader.setMat4("view", g_camera.GetViewMatrix());
-    for (auto& light : g_lights) {
-        lightShader.setVec3("lightColor", light.color);
-        light.Draw(lightShader);
-    }
-
-    // STEP 2: Post-processing - render to screen
-    // Gaussian Blur
-    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    blurShader.Activate();
-    glBindVertexArray(quadVAO);
-    glDisable(GL_DEPTH_TEST);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-    //glUniform1i(glGetUniformLocation(blurShader.ID, "screenTexture"), 0);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    // Laplacian Edge Detection
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    edgeShader.Activate();
-    glBindVertexArray(quadVAO);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, intermediateTex);
-    //glUniform1i(glGetUniformLocation(edgeShader.ID, "screenTexture"), 0);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    // Chromakey Overlay
-    chromakeyingShader.Activate();
-    glBindVertexArray(quadVAO);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, borderTex);
-    //glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    glfwSwapBuffers(g_window);
-    glfwPollEvents();
-}
-
-    glfwDestroyWindow(g_window);
+    // Cleanup
+    glDeleteVertexArrays(1, &buttonVAO);
+    glDeleteBuffers(1, &buttonVBO);
+    delete buttonShader;
     delete g_railway;
     delete g_train;
+    glfwDestroyWindow(g_window);
     glfwTerminate();
     return 0;
-    //-------------------------------------------------------------------------------------------------------
+}
+
+void renderButton() {
+    // Enable blending for button transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    buttonShader->Activate();
+
+    // Calculate button position in normalized coordinates
+    float normalizedX = (speedButton.x * 2.0f) / g_windowWidth - 1.0f;
+    float normalizedY = (speedButton.y * 2.0f) / g_windowHeight - 1.0f;
+    float normalizedWidth = (speedButton.width * 2.0f) / g_windowWidth;
+    float normalizedHeight = (speedButton.height * 2.0f) / g_windowHeight;
+
+    // Create transformation matrix for button
+    glm::mat4 buttonTransform = glm::mat4(1.0f);
+    buttonTransform = glm::translate(buttonTransform, glm::vec3(normalizedX, normalizedY, 0.0f));
+    buttonTransform = glm::scale(buttonTransform, glm::vec3(normalizedWidth, normalizedHeight, 1.0f));
+
+    buttonShader->setMat4("transform", buttonTransform);
+
+    // Set button color (red for stopped, green for continue)
+    if (trainStopped) {
+        buttonShader->setVec4("buttonColor", glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
+    } else {
+        buttonShader->setVec4("buttonColor", glm::vec4(0.2f, 0.8f, 0.2f, 0.8f)); // Green
+    }
+
+    glBindVertexArray(buttonVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDisable(GL_BLEND);
+}
+
+bool isPointInButton(double x, double y) {
+    // Convert screen coordinates to button coordinates
+    return (x >= speedButton.x && x <= speedButton.x + speedButton.width &&
+            y >= speedButton.y && y <= speedButton.y + speedButton.height);
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
@@ -371,52 +367,33 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
 
-        // Raycasting
-        glm::vec4 viewport(0.0f, 0.0f, g_windowWidth, g_windowHeight);
-        glm::mat4 view = g_camera.GetViewMatrix();
+        // Convert to screen coordinates (flip Y)
+        ypos = g_windowHeight - ypos;
 
-        glm::vec3 rayOrigin = g_camera.getPosition();
-        glm::vec3 worldNear = glm::unProject(
-            glm::vec3(xpos, g_windowHeight - ypos, 0.0f),
-            view, g_projectionMatrix, viewport
-        );
-        glm::vec3 rayDirection = glm::normalize(worldNear - rayOrigin);
-
-        // Find closest rail
-        float pickRadius = 5.0f;
-        float closestDistance = std::numeric_limits<float>::max();
-        int pickedRailIndex = -1;
-
-        const auto& railPositions = g_railway->GetRailPositions();
-        const auto& railDistances = g_railway->GetRailDistances();
-
-        for (size_t i = 0; i < railPositions.size(); ++i) {
-            glm::vec3 railPos = railPositions[i];
-            glm::vec3 oc = railPos - rayOrigin;
-            float t = glm::dot(oc, rayDirection);
-            glm::vec3 pointOnRay = rayOrigin + rayDirection * t;
-            float distance = glm::distance(railPos, pointOnRay);
-
-            if (t > 0 && distance < pickRadius && distance < closestDistance) {
-                closestDistance = distance;
-                pickedRailIndex = static_cast<int>(i);
+        // Check if button was clicked
+        if ( isPointInButton(xpos, ypos)) {
+            if (trainStopped) {
+                // Resume train
+                trainStopped = false;
+                g_train->speed = normalSpeed;
+                speedButton.text = "STOP TRAIN";
+            } else {
+                // Stop train
+                trainStopped = true;
+                g_train->speed = 0.0f;
+                speedButton.text = "CONTINUE";
             }
-        }
-
-        // Update train position
-        if (pickedRailIndex != -1 && pickedRailIndex < static_cast<int>(railDistances.size())) {
-            float targetDistance = railDistances[pickedRailIndex];
-            float currentTime = glfwGetTime();
-            float speed = 5.0f;
-            g_train->SetTimeOffset(currentTime - (targetDistance / speed));
         }
     }
 }
+
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     g_windowWidth = width;
     g_windowHeight = height;
     glViewport(0, 0, width, height);
 }
+
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 {
     float xpos = static_cast<float>(xposIn);
