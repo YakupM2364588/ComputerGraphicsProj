@@ -24,7 +24,7 @@ uniform vec3 viewPos;
 uniform sampler2D diffuse_texture;
 uniform float shininess;
 
-#define LIGHTS 1
+#define LIGHTS 3
 
 uniform Light lights[LIGHTS];
 
@@ -37,7 +37,7 @@ void main()
     vec3 texColor = texture(diffuse_texture, TexCoords).rgb;
 
     //Check als texColor bestaat
-    vec3 finalColor = (texColor == vec3(0.0f)) ? Color : texColor;
+    vec3 finalColor = Color ;
 
     for(int i = 0; i < LIGHTS; i++)
     {
@@ -57,7 +57,6 @@ void main()
         vec3 diffuse  = lights[i].diffuse * diff * finalColor;
         vec3 specular = lights[i].specular * spec;
 
-        ambient  *= weakening;
         diffuse  *= weakening;
         specular *= weakening;
 
