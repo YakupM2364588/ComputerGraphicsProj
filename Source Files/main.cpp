@@ -18,9 +18,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void renderButton();
-bool isPointInButton(double x, double y);
-bool trainStopped = false;
 //---------------------------------------------- Variables ----------------------------------------------
 // Window dimensions
 const unsigned int SCR_WIDTH = 800;
@@ -28,15 +25,6 @@ const unsigned int SCR_HEIGHT = 600;
 
 // Train speed control
 float normalSpeed = 5.0f;
-
-// Button properties
-struct Button {
-    float x = 50.0f;      // Button position from left
-    float y = 50.0f;      // Button position from bottom
-    float width = 150.0f;
-    float height = 40.0f;
-    std::string text = "CONTINUE";
-} speedButton;
 
 // Control points for the bezier curves
 std::vector<std::vector<glm::vec3>> curvesControlPoints = {
@@ -102,6 +90,8 @@ int main() {
     glEnable(GL_DEPTH_TEST);
 
     // Set callbacks
+    glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
     glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
     glfwSetCursorPosCallback(g_window, mouse_callback);
     glfwSetMouseButtonCallback(g_window, mouse_button_callback);
@@ -233,8 +223,6 @@ int main() {
     Shader mainShader(RESOURCE_PATH"shaders/area.vert", RESOURCE_PATH"shaders/area.frag");
     Shader lightShader(RESOURCE_PATH"shaders/sun.vert", RESOURCE_PATH"shaders/sun.frag");
 
-    // Create button shader (simple colored rectangle)
-    buttonShader = new Shader(RESOURCE_PATH"shaders/button.vert", RESOURCE_PATH"shaders/button.frag");
 
     //--------------------------------------------- Render loop ---------------------------------------------
     while (!glfwWindowShouldClose(g_window))
@@ -305,8 +293,6 @@ int main() {
         glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // Render button if visible
-            renderButton();
 
         glfwSwapBuffers(g_window);
         glfwPollEvents();
@@ -315,7 +301,6 @@ int main() {
     // Cleanup
     glDeleteVertexArrays(1, &buttonVAO);
     glDeleteBuffers(1, &buttonVBO);
-    delete buttonShader;
     delete g_railway;
     delete g_train;
     glfwDestroyWindow(g_window);
@@ -323,69 +308,24 @@ int main() {
     return 0;
 }
 
-void renderButton() {
-    // Enable blending for button transparency
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    buttonShader->Activate();
-
-    // Calculate button position in normalized coordinates
-    float normalizedX = (speedButton.x * 2.0f) / g_windowWidth - 1.0f;
-    float normalizedY = (speedButton.y * 2.0f) / g_windowHeight - 1.0f;
-    float normalizedWidth = (speedButton.width * 2.0f) / g_windowWidth;
-    float normalizedHeight = (speedButton.height * 2.0f) / g_windowHeight;
-
-    // Create transformation matrix for button
-    glm::mat4 buttonTransform = glm::mat4(1.0f);
-    buttonTransform = glm::translate(buttonTransform, glm::vec3(normalizedX, normalizedY, 0.0f));
-    buttonTransform = glm::scale(buttonTransform, glm::vec3(normalizedWidth, normalizedHeight, 1.0f));
-
-    buttonShader->setMat4("transform", buttonTransform);
-
-    // Set button color (red for stopped, green for continue)
-    if (trainStopped) {
-        buttonShader->setVec4("buttonColor", glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
-    } else {
-        buttonShader->setVec4("buttonColor", glm::vec4(0.2f, 0.8f, 0.2f, 0.8f)); // Green
-    }
-
-    glBindVertexArray(buttonVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    glDisable(GL_BLEND);
-}
-
-bool isPointInButton(double x, double y) {
-    // Convert screen coordinates to button coordinates
-    return (x >= speedButton.x && x <= speedButton.x + speedButton.width &&
-            y >= speedButton.y && y <= speedButton.y + speedButton.height);
-}
-
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
 
         // Convert to screen coordinates (flip Y)
         ypos = g_windowHeight - ypos;
 
-        // Check if button was clicked
-        if ( isPointInButton(xpos, ypos)) {
-            if (trainStopped) {
-                // Resume train
-                trainStopped = false;
-                g_train->speed = normalSpeed;
-                speedButton.text = "STOP TRAIN";
-            } else {
-                // Stop train
-                trainStopped = true;
-                g_train->speed = 0.0f;
-                speedButton.text = "CONTINUE";
-            }
+        if (action == GLFW_PRESS) {
+            // Stop train while mouse button is held
+            g_train->speed = 0.0f;
+        } else if (action == GLFW_RELEASE) {
+            // Resume train when mouse button is released
+            g_train->speed = normalSpeed;
         }
     }
 }
+
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
