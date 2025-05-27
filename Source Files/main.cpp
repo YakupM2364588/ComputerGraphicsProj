@@ -13,34 +13,29 @@
 #include "light.h"
 #include "railway.h"
 #include "train.h"
+#include "button.h"
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void renderButton();
-bool isPointInButton(double x, double y);
-bool trainStopped = false;
+
 //---------------------------------------------- Variables ----------------------------------------------
 // Window dimensions
-bool buttonVisible = true;
-GLuint pickingFBO, pickingTexture;
-Shader* pickingShader = nullptr;
-const glm::vec3 buttonColorID(1.0f, 1.0f, 1.0f);
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+
+// Button and UI state
+bool buttonVisible = true;
+bool trainStopped = false;
+Button* g_speedButton = nullptr;
 
 // Train speed control
 float normalSpeed = 5.0f;
 
-// Button properties
-struct Button {
-    float x = 50.0f;      // Button position from left
-    float y = 50.0f;      // Button position from bottom
-    float width = 150.0f;
-    float height = 40.0f;
-    std::string text = "CONTINUE";
-} speedButton;
+// Picking framebuffer
+GLuint pickingFBO, pickingTexture;
+Shader* pickingShader = nullptr;
 
 // Control points for the bezier curves
 std::vector<std::vector<glm::vec3>> curvesControlPoints = {
@@ -83,8 +78,7 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-// GUI rendering variables
-GLuint buttonVAO, buttonVBO;
+// Shaders
 Shader* buttonShader = nullptr;
 //-------------------------------------------------------------------------------------------------------
 
@@ -107,7 +101,6 @@ int main() {
 
     // Set callbacks
     glfwSetKeyCallback(g_window, key_callback);
-
     glfwSetFramebufferSizeCallback(g_window, framebuffer_size_callback);
     glfwSetCursorPosCallback(g_window, mouse_callback);
     glfwSetMouseButtonCallback(g_window, mouse_button_callback);
@@ -156,6 +149,8 @@ int main() {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     //-------------------------------------------------------------------------------------------------------
+
+    // Picking framebuffer setup
     glGenFramebuffers(1, &pickingFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO);
 
@@ -165,8 +160,21 @@ int main() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pickingTexture, 0);
 
+    // Create picking depth buffer
+    GLuint pickingDepthBuffer;
+    glGenRenderbuffers(1, &pickingDepthBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, pickingDepthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, pickingDepthBuffer);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Picking framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // Create picking shader
     pickingShader = new Shader(RESOURCE_PATH"shaders/picking.vert", RESOURCE_PATH"shaders/picking.frag");
+
     //--------------------------------------------- Quad VAO, VBO -------------------------------------------
     float quadVertices[] = {
         -1.0f,  1.0f,  0.0f, 1.0f,
@@ -189,33 +197,22 @@ int main() {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
-
-    // Setup button rendering
-    float buttonVertices[] = {
-        0.0f, 1.0f,  // Top left
-        0.0f, 0.0f,  // Bottom left
-        1.0f, 0.0f,  // Bottom right
-
-        0.0f, 1.0f,  // Top left
-        1.0f, 0.0f,  // Bottom right
-        1.0f, 1.0f   // Top right
-    };
-
-    glGenVertexArrays(1, &buttonVAO);
-    glGenBuffers(1, &buttonVBO);
-    glBindVertexArray(buttonVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, buttonVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(buttonVertices), buttonVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glBindVertexArray(0);
     //-------------------------------------------------------------------------------------------------------
+
+    //----------------------------------------- Initialize Button ----------------------------------------
+    // Create button shader
+    buttonShader = new Shader(RESOURCE_PATH"shaders/button.vert", RESOURCE_PATH"shaders/button.frag");
+
+    // Create button instance
+    g_speedButton = new Button(50.0f, 50.0f, 150.0f, 40.0f, "CONTINUE", glm::vec3(1.0f, 1.0f, 1.0f));
+    g_speedButton->Initialize();
+    //------------------------------------------------------------------------------------------------
 
     //----------------------------------------- Convolution shader ------------------------------------------
     float gaussian[9] = {
-    1.0 / 16, 2.0 / 16, 1.0 / 16,
-    2.0 / 16, 4.0 / 16, 2.0 / 16,
-    1.0 / 16, 2.0 / 16, 1.0 / 16
+        1.0 / 16, 2.0 / 16, 1.0 / 16,
+        2.0 / 16, 4.0 / 16, 2.0 / 16,
+        1.0 / 16, 2.0 / 16, 1.0 / 16
     };
 
     float laplacian[9] = {
@@ -226,6 +223,7 @@ int main() {
 
     Shader blurShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
     Shader edgeShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
+
     // Gaussian kernel to blurShader
     blurShader.Activate();
     for (int i = 0; i < 9; i++)
@@ -280,9 +278,6 @@ int main() {
     Shader mainShader(RESOURCE_PATH"shaders/area.vert", RESOURCE_PATH"shaders/area.frag");
     Shader lightShader(RESOURCE_PATH"shaders/sun.vert", RESOURCE_PATH"shaders/sun.frag");
 
-    // Create button shader (simple colored rectangle)
-    buttonShader = new Shader(RESOURCE_PATH"shaders/button.vert", RESOURCE_PATH"shaders/button.frag");
-
     //--------------------------------------------- Render loop ---------------------------------------------
     while (!glfwWindowShouldClose(g_window))
     {
@@ -297,7 +292,6 @@ int main() {
         if (!buttonVisible) {
             g_camera.processInput(g_window, deltaTime);
         }
-
 
         // Update train with current speed
         g_train->Update(deltaTime, g_railway->GetPath());
@@ -344,7 +338,6 @@ int main() {
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-        //glUniform1i(glGetUniformLocation(blurShader.ID, "screenTexture"), 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Laplacian Edge Detection
@@ -356,7 +349,6 @@ int main() {
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, intermediateTex);
-        //glUniform1i(glGetUniformLocation(edgeShader.ID, "screenTexture"), 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Chromakey Overlay
@@ -365,118 +357,71 @@ int main() {
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, borderTex);
-        //glUniform1i(glGetUniformLocation(chromakeyingShader.ID, "overlayTexture"), 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Render button if visible
-        renderButton();
+        if (g_speedButton && buttonVisible) {
+            // Update button appearance based on train state
+            if (trainStopped) {
+                g_speedButton->SetColor(glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
+                g_speedButton->text = "CONTINUE";
+            } else {
+                g_speedButton->SetColor(glm::vec4(0.2f, 0.8f, 0.2f, 0.8f)); // Green
+                g_speedButton->text = "STOP TRAIN";
+            }
+            g_speedButton->Render(*buttonShader, SCR_WIDTH, SCR_HEIGHT);
+        }
 
         glfwSwapBuffers(g_window);
         glfwPollEvents();
     }
 
     // Cleanup
-    glDeleteVertexArrays(1, &buttonVAO);
-    glDeleteBuffers(1, &buttonVBO);
+    if (g_speedButton) {
+        delete g_speedButton;
+    }
     delete buttonShader;
+    delete pickingShader;
     glDeleteFramebuffers(1, &pickingFBO);
     glDeleteTextures(1, &pickingTexture);
-    delete pickingShader;
     delete g_railway;
     delete g_train;
     glfwDestroyWindow(g_window);
     glfwTerminate();
     return 0;
 }
-void renderButton() {
-    if (!buttonVisible) return; // Don't render if invisible
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    buttonShader->Activate();
-
-    float normalizedX = (speedButton.x * 2.0f) / g_windowWidth - 1.0f;
-    float normalizedY = (speedButton.y * 2.0f) / g_windowHeight - 1.0f;
-    float normalizedWidth = (speedButton.width * 2.0f) / g_windowWidth;
-    float normalizedHeight = (speedButton.height * 2.0f) / g_windowHeight;
-
-    glm::mat4 buttonTransform = glm::mat4(1.0f);
-    buttonTransform = glm::translate(buttonTransform, glm::vec3(normalizedX, normalizedY, 0.0f));
-    buttonTransform = glm::scale(buttonTransform, glm::vec3(normalizedWidth, normalizedHeight, 1.0f));
-
-    buttonShader->setMat4("transform", buttonTransform);
-
-    if (trainStopped) {
-        buttonShader->setVec4("buttonColor", glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
-    } else {
-        buttonShader->setVec4("buttonColor", glm::vec4(0.2f, 0.8f, 0.2f, 0.8f)); // Green
-    }
-
-    glBindVertexArray(buttonVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    glDisable(GL_BLEND);
-}
-
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && g_speedButton && buttonVisible) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
-        ypos = SCR_HEIGHT - ypos; // Flip y-axis
 
-        // Render to picking framebuffer
-        glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // Render button with unique color
-        pickingShader->Activate();
-        pickingShader->setVec3("pickingColor", buttonColorID);
-
-        // Use the same transform as in renderButton()
-        float normalizedX = (speedButton.x * 2.0f) / SCR_WIDTH - 1.0f;
-        float normalizedY = (speedButton.y * 2.0f) / SCR_HEIGHT - 1.0f;
-        float normalizedWidth = (speedButton.width * 2.0f) / SCR_WIDTH;
-        float normalizedHeight = (speedButton.height * 2.0f) / SCR_HEIGHT;
-
-        glm::mat4 buttonTransform = glm::mat4(1.0f);
-        buttonTransform = glm::translate(buttonTransform, glm::vec3(normalizedX, normalizedY, 0.0f));
-        buttonTransform = glm::scale(buttonTransform, glm::vec3(normalizedWidth, normalizedHeight, 1.0f));
-        pickingShader->setMat4("transform", buttonTransform);
-
-        glBindVertexArray(buttonVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        // Read pixel color
-        GLfloat pixel[3];
-        glReadPixels(xpos, ypos, 1, 1, GL_RGB, GL_FLOAT, &pixel);
-        glm::vec3 clickedColor = glm::vec3(pixel[0], pixel[1], pixel[2]);
-
-        // Check if colors match (with some tolerance for floating point precision)
-        if (glm::distance(clickedColor, buttonColorID) < 0.1f) {
-            // Toggle train state
+        // Handle button click
+        if (g_speedButton->HandleClick(xpos, ypos, SCR_WIDTH, SCR_HEIGHT,
+                                      pickingFBO, pickingTexture, *pickingShader)) {
+            // Button was clicked - toggle train state
             trainStopped = !trainStopped;
             g_train->speed = trainStopped ? 0.0f : normalSpeed;
-            speedButton.text = trainStopped ? "CONTINUE" : "STOP TRAIN";
         }
-
-        // Switch back to main framebuffer
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 }
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
         buttonVisible = !buttonVisible;
+
+        if (g_speedButton) {
+            g_speedButton->SetVisible(buttonVisible);
+        }
 
         if (buttonVisible) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         } else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            firstMouse = true;
         }
     }
 }
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     g_windowWidth = width;
@@ -484,21 +429,20 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
-{    if (buttonVisible) return;  // Blokkeer camera rotatie
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+    if (buttonVisible) return;
 
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
-    if (firstMouse)
-    {
+    if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
         firstMouse = false;
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
+    float yoffset = lastY - ypos;  // Reversed since y-coordinates go from bottom to top
 
     lastX = xpos;
     lastY = ypos;
