@@ -24,7 +24,9 @@ bool trainStopped = false;
 //---------------------------------------------- Variables ----------------------------------------------
 // Window dimensions
 bool buttonVisible = true;
-
+GLuint pickingFBO, pickingTexture;
+Shader* pickingShader = nullptr;
+const glm::vec3 buttonColorID(1.0f, 1.0f, 1.0f);
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
@@ -154,7 +156,17 @@ int main() {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     //-------------------------------------------------------------------------------------------------------
+    glGenFramebuffers(1, &pickingFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO);
 
+    // Create picking texture
+    glGenTextures(1, &pickingTexture);
+    glBindTexture(GL_TEXTURE_2D, pickingTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pickingTexture, 0);
+
+    // Create picking shader
+    pickingShader = new Shader(RESOURCE_PATH"shaders/picking.vert", RESOURCE_PATH"shaders/picking.frag");
     //--------------------------------------------- Quad VAO, VBO -------------------------------------------
     float quadVertices[] = {
         -1.0f,  1.0f,  0.0f, 1.0f,
@@ -367,6 +379,9 @@ int main() {
     glDeleteVertexArrays(1, &buttonVAO);
     glDeleteBuffers(1, &buttonVBO);
     delete buttonShader;
+    glDeleteFramebuffers(1, &pickingFBO);
+    glDeleteTextures(1, &pickingTexture);
+    delete pickingShader;
     delete g_railway;
     delete g_train;
     glfwDestroyWindow(g_window);
@@ -405,34 +420,49 @@ void renderButton() {
 }
 
 
-bool isPointInButton(double x, double y) {
-    // Convert screen coordinates to button coordinates
-    return (x >= speedButton.x && x <= speedButton.x + speedButton.width &&
-            y >= speedButton.y && y <= speedButton.y + speedButton.height);
-}
-
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
+        ypos = SCR_HEIGHT - ypos; // Flip y-axis
 
-        // Convert to screen coordinates (flip Y)
-        ypos = g_windowHeight - ypos;
+        // Render to picking framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Check if button was clicked
-        if ( isPointInButton(xpos, ypos)) {
-            if (trainStopped) {
-                // Resume train
-                trainStopped = false;
-                g_train->speed = normalSpeed;
-                speedButton.text = "STOP TRAIN";
-            } else {
-                // Stop train
-                trainStopped = true;
-                g_train->speed = 0.0f;
-                speedButton.text = "CONTINUE";
-            }
+        // Render button with unique color
+        pickingShader->Activate();
+        pickingShader->setVec3("pickingColor", buttonColorID);
+
+        // Use the same transform as in renderButton()
+        float normalizedX = (speedButton.x * 2.0f) / SCR_WIDTH - 1.0f;
+        float normalizedY = (speedButton.y * 2.0f) / SCR_HEIGHT - 1.0f;
+        float normalizedWidth = (speedButton.width * 2.0f) / SCR_WIDTH;
+        float normalizedHeight = (speedButton.height * 2.0f) / SCR_HEIGHT;
+
+        glm::mat4 buttonTransform = glm::mat4(1.0f);
+        buttonTransform = glm::translate(buttonTransform, glm::vec3(normalizedX, normalizedY, 0.0f));
+        buttonTransform = glm::scale(buttonTransform, glm::vec3(normalizedWidth, normalizedHeight, 1.0f));
+        pickingShader->setMat4("transform", buttonTransform);
+
+        glBindVertexArray(buttonVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Read pixel color
+        GLfloat pixel[3];
+        glReadPixels(xpos, ypos, 1, 1, GL_RGB, GL_FLOAT, &pixel);
+        glm::vec3 clickedColor = glm::vec3(pixel[0], pixel[1], pixel[2]);
+
+        // Check if colors match (with some tolerance for floating point precision)
+        if (glm::distance(clickedColor, buttonColorID) < 0.1f) {
+            // Toggle train state
+            trainStopped = !trainStopped;
+            g_train->speed = trainStopped ? 0.0f : normalSpeed;
+            speedButton.text = trainStopped ? "CONTINUE" : "STOP TRAIN";
         }
+
+        // Switch back to main framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 }
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
