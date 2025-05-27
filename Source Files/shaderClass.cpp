@@ -1,11 +1,13 @@
 #include"shaderClass.h"
 
+#include <cstring>
+
 // Converts textfile to string
 std::string fileToString(const char* filename)
 {
 	std::ifstream file(filename);
 	if (!file.is_open()) {
-		throw(errno); // Throw error if unable to open file
+		throw std::runtime_error("Failed to open file: " + std::string(std::strerror(errno)) + filename);
 	}
 	std::stringstream output;
 	output << file.rdbuf();

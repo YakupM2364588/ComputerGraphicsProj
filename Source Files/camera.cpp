@@ -1,7 +1,7 @@
 #include"camera.h"
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-	: Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(2.5f), MouseSensitivity(0.1f), Up(up)
+	: Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(8.5f), MouseSensitivity(0.1f), Up(up)
 {
 	Position = position;
 	WorldUp = up;

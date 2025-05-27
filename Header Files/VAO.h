@@ -13,11 +13,13 @@ public:
 
 	// Links a VBO to the VAO using a certain layout
 	void LinkVBO(VBO& VBO, GLuint layout, GLint components,
-				 GLenum type, GLsizei stride, const void* offset);;
+				 GLenum type, GLsizei stride, const void* offset);
+
+	void LinkVBO(VBO &VBO, GLuint layout);;
 	// Binds the VAO
-	void Bind();
+	void Bind() const;
 	// Unbinds the VAO
-	void Unbind();
+	void Unbind() const;
 	// Deletes the VAO
 	void Delete();
 };

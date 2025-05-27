@@ -14,7 +14,7 @@ public:
 
     Model(const std::string& filepath, const std::string& mtlBasePath = "");
 
-    void Draw(Shader& shader);
+    void Draw(const Shader& shader);
 
     void AddMesh(const Mesh& mesh);
 
