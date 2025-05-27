@@ -28,7 +28,7 @@ void Railway::Draw(Shader& shader) {
 }
 
 void Railway::GenerateRailPositions() {
-    const float RailLength = 1.3f;
+    const float RailLength = 0.5f;
     float totalLength = m_path.getTotalLength();
 
     m_railPositions.clear();
