@@ -111,6 +111,7 @@ int main() {
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
+
     GLuint texColorBuffer;
     glGenTextures(1, &texColorBuffer);
     glBindTexture(GL_TEXTURE_2D, texColorBuffer);
@@ -149,7 +150,8 @@ int main() {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     //-------------------------------------------------------------------------------------------------------
-
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
     // Picking framebuffer setup
     glGenFramebuffers(1, &pickingFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO);
@@ -268,11 +270,13 @@ int main() {
 
     g_lights = {
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-              {20.0f, 30.0f, 20.0f}, {1.0f, 0.0f, 0.0f}),
+              {30.0f, 10.0f, 10.0f}, {1.0f, 0.0f, 0.0f}),
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-              {0.0f, 50.0f, 0.0f}, {1.0f, 1.0f, 0.0f}),
+              {0.0f, 10.0f, 30.0f}, {0.0f, 1.0f, 0.0f}),
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-              {-20.0f, 30.0f, -20.0f}, {0.6f, 0.8f, 1.0f})
+              {-30.0f, 10.0f, -10.0f}, {0.0f, 0.0f, 1.0f}),
+        Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
+             {0.0f, 10.0f, -30.0f}, {1.0f, 0.9f, 0.0f}),
     };
 
     Shader mainShader(RESOURCE_PATH"shaders/area.vert", RESOURCE_PATH"shaders/area.frag");

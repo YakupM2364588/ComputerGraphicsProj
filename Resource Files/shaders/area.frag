@@ -24,7 +24,7 @@ uniform vec3 viewPos;
 uniform sampler2D diffuse_texture;
 uniform float shininess;
 
-#define LIGHTS 3
+#define LIGHTS 4
 
 uniform Light lights[LIGHTS];
 

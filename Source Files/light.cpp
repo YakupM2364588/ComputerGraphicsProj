@@ -9,7 +9,7 @@ Light::Light(const std::string& modelPath, const std::string& mtlPath,
              float constant, float linear, float quadratic)
     : model(modelPath, mtlPath), position(position), color(color),
       constant(constant), linear(linear), quadratic(quadratic) {
-    model.SetScale(glm::vec3(0.2f));
+    model.SetScale(glm::vec3(0.05f));
 }
 
 void Light::Draw(Shader& shader) {
