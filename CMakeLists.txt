@@ -38,6 +38,7 @@ add_executable(opengl_project
         "Source Files/texture.cpp"
         "Source Files/train.cpp"
         "Source Files/tiny_obj_loader.cpp"
+        "Source Files/button.cpp"
 )
 target_link_libraries(opengl_project ${LIBS})
 target_compile_definitions(opengl_project PRIVATE RESOURCE_PATH="${CMAKE_SOURCE_DIR}/Resource Files/")

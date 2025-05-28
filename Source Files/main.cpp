@@ -22,13 +22,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 //---------------------------------------------- Variables ----------------------------------------------
 // Window dimensions
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1920;
+const unsigned int SCR_HEIGHT = 1080;
 
 // Button and UI state
 bool buttonVisible = true;
 bool trainStopped = false;
 Button* g_speedButton = nullptr;
+bool trainPOV = false;
 
 // Train speed control
 float normalSpeed = 5.0f;
@@ -293,10 +294,14 @@ int main() {
         glm::mat4 view = g_camera.GetViewMatrix();
 
         // Process input
-        if (!buttonVisible) {
+        if (!buttonVisible || trainPOV == false) {
             g_camera.processInput(g_window, deltaTime);
         }
-
+		if (trainPOV) {
+			glm::vec3 trainFront = g_train->GetFrontPosition(g_railway->GetPath());
+			g_camera.setPosition(trainFront + glm::vec3(0.0f, 1.5f, 0.0f));
+			g_camera.ProcessMouseMovement(0.0f, 0.0f);
+		}
         // Update train with current speed
         g_train->Update(deltaTime, g_railway->GetPath());
 
@@ -424,6 +429,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             firstMouse = true;
         }
+    }
+    if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+		trainPOV = !trainPOV;
     }
 }
 

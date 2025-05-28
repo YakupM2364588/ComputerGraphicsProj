@@ -13,6 +13,8 @@ public:
     Train(const std::string& modelPath, const std::string& mtlPath);
     void Update(float deltaTime, BezierCurvePath& path);
     void Draw(Shader& shader);
+    glm::vec3 GetFrontPosition(BezierCurvePath& path) const;
+
 
     Model model;
     float speed = 5.0f;

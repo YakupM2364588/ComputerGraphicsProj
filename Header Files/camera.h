@@ -30,6 +30,7 @@ private:
 
 public:
 	glm::vec3 getPosition();
+	void setPosition(glm::vec3 position);
 	Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = -90.0f, float pitch = 0.0f);
 	void processInput(GLFWwindow* window, float dt);
 	void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);
