@@ -54,6 +54,9 @@ void Train::Update(float deltaTime, BezierCurvePath& path) {
 
         model.SetPosition(adjustedTrainPos);
         model.SetRotation(trainEulerRotation);
+
+        float frontOffset = 3.0f;
+        frontPosition = adjustedTrainPos + trainDirection * frontOffset;
     }
 }
 
@@ -61,28 +64,7 @@ void Train::Draw(Shader& shader) {
     model.Draw(shader);
 }
 
-glm::vec3 Train::GetFrontPosition(BezierCurvePath& path) const
+glm::vec3 Train::GetFrontPosition() const
 {
-    if (speed <= 0.0f) {
-        return model.GetPosition();
-    }
-
-    float totalLength = path.getTotalLength();
-    float dist = fmod(accumulatedTime * speed, totalLength);
-    if (dist < 0.0f) dist = 0.0f;
-
-    glm::vec3 trainPos = path.Evaluate(dist);
-
-    float lookAheadDistance = 1.0f;
-    float nextDist = std::min(dist + lookAheadDistance, totalLength);
-    glm::vec3 nextPos = path.Evaluate(nextDist);
-
-    glm::vec3 trainDirection = glm::normalize(nextPos - trainPos);
-    if (glm::length(trainDirection) < 0.001f) {
-        trainDirection = glm::vec3(0.0f, 0.0f, 1.0f);
-    }
-
-    float frontOffset = 3.0f;
-
-    return model.GetPosition() + trainDirection * frontOffset;
+    return frontPosition;
 }

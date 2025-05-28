@@ -298,7 +298,7 @@ int main() {
             g_camera.processInput(g_window, deltaTime);
         }
 		if (trainPOV) {
-			glm::vec3 trainFront = g_train->GetFrontPosition(g_railway->GetPath());
+			glm::vec3 trainFront = g_train->GetFrontPosition();
 			g_camera.setPosition(trainFront + glm::vec3(0.0f, 1.5f, 0.0f));
 			g_camera.ProcessMouseMovement(0.0f, 0.0f);
 		}
