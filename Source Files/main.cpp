@@ -22,11 +22,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 //---------------------------------------------- Variables ----------------------------------------------
 // Window dimensions
-const unsigned int SCR_WIDTH = 1920;
-const unsigned int SCR_HEIGHT = 1080;
+unsigned int SCR_WIDTH = 1920;
+unsigned int SCR_HEIGHT = 1080;
 
 // Button and UI state
-bool buttonVisible = true;
+bool buttonVisible = false;
 bool trainStopped = false;
 Button* g_speedButton = nullptr;
 bool trainPOV = false;
@@ -38,34 +38,10 @@ float normalSpeed = 5.0f;
 GLuint pickingFBO, pickingTexture;
 Shader* pickingShader = nullptr;
 
-// Control points for the bezier curves
-std::vector<std::vector<glm::vec3>> curvesControlPoints = {
-    {
-        glm::vec3(-0.8f, -0.5f, -0.5f),
-        glm::vec3(-0.3f, 0.8f, 0.2f),
-        glm::vec3(0.3f, -0.8f, -0.2f),
-        glm::vec3(0.8f, 0.5f, 0.5f)
-    },
-    {
-        glm::vec3(0.8f, 0.5f, 0.5f),
-        glm::vec3(1.3f, -0.2f, 0.8f),
-        glm::vec3(0.2f, -0.6f, 0.3f),
-        glm::vec3(-0.5f, 0.3f, -0.3f)
-    },
-    {
-        glm::vec3(-0.5f, 0.3f, -0.3f),
-        glm::vec3(-1.2f, 0.7f, -0.8f),
-        glm::vec3(-0.7f, -0.2f, -0.5f),
-        glm::vec3(-0.8f, -0.5f, -0.5f)
-    }
-};
-
 // Global variables
 Railway* g_railway = nullptr;
 Train* g_train = nullptr;
 glm::mat4 g_projectionMatrix;
-int g_windowWidth = 800;
-int g_windowHeight = 600;
 std::vector<Light> g_lights;
 GLFWwindow* g_window;
 
@@ -107,11 +83,10 @@ int main() {
     glfwSetMouseButtonCallback(g_window, mouse_button_callback);
     //-------------------------------------------------------------------------------------------------------
 
-    //--------------------------------------------- Framebuffer ---------------------------------------------
+    //--------------------------------------------- Main Framebuffer ---------------------------------------------
     GLuint fbo;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
 
     GLuint texColorBuffer;
     glGenTextures(1, &texColorBuffer);
@@ -150,9 +125,53 @@ int main() {
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    //-------------------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    //--------------------------------------------- Light-only Framebuffer ---------------------------------------------
+    GLuint lightOnlyFBO;
+    glGenFramebuffers(1, &lightOnlyFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, lightOnlyFBO);
+
+    GLuint lightOnlyTex;
+    glGenTextures(1, &lightOnlyTex);
+    glBindTexture(GL_TEXTURE_2D, lightOnlyTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, lightOnlyTex, 0);
+
+    // Attach same depth buffer
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Light-only framebuffer is not complete!" << std::endl;
+
+    //---------------------------------------------  Ping-Pong Blur Framebuffers ---------------------------------------------
+    GLuint pingpongFBO[2];
+    GLuint pingpongTex[2];
+
+    glGenFramebuffers(2, pingpongFBO);
+    glGenTextures(2, pingpongTex);
+
+    for (unsigned int i = 0; i < 2; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
+        glBindTexture(GL_TEXTURE_2D, pingpongTex[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongTex[i], 0);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cout << "ERROR::FRAMEBUFFER:: Ping-pong framebuffer " << i << " is not complete!" << std::endl;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    //-------------------------------------------------------------------------------------------------------
+
+    //--------------------------------------------- Picking Setup -------------------------------------------
     // Picking framebuffer setup
     glGenFramebuffers(1, &pickingFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO);
@@ -177,6 +196,7 @@ int main() {
 
     // Create picking shader
     pickingShader = new Shader(RESOURCE_PATH"shaders/picking.vert", RESOURCE_PATH"shaders/picking.frag");
+    //-------------------------------------------------------------------------------------------------------
 
     //--------------------------------------------- Quad VAO, VBO -------------------------------------------
     float quadVertices[] = {
@@ -212,26 +232,23 @@ int main() {
     //------------------------------------------------------------------------------------------------
 
     //----------------------------------------- Convolution shader ------------------------------------------
-    float gaussian[9] = {
-        1.0 / 16, 2.0 / 16, 1.0 / 16,
-        2.0 / 16, 4.0 / 16, 2.0 / 16,
-        1.0 / 16, 2.0 / 16, 1.0 / 16
-    };
-
     float laplacian[9] = {
          1,  1,  1,
          1, -7,  1,
          1,  1,  1
     };
 
-    Shader blurShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
+    Shader blurShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/blur.frag");
     Shader edgeShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/convolution.frag");
 
     // Gaussian kernel to blurShader
     blurShader.Activate();
-    for (int i = 0; i < 9; i++)
-        glUniform1f(glGetUniformLocation(blurShader.ID, ("kernel[" + std::to_string(i) + "]").c_str()), gaussian[i]);
-    glUniform1f(glGetUniformLocation(blurShader.ID, "offset"), 1.0f / SCR_WIDTH);
+    blurShader.setInt("image", 0);
+
+    // Gaussian blur shader for lights
+    Shader lightBlurShader(RESOURCE_PATH "shaders/convolution.vert", RESOURCE_PATH "shaders/blur.frag");
+    lightBlurShader.Activate();
+    lightBlurShader.setInt("image", 0);
 
     // Laplacian kernel to edgeShader
     edgeShader.Activate();
@@ -297,11 +314,11 @@ int main() {
         if (!buttonVisible || trainPOV == false) {
             g_camera.processInput(g_window, deltaTime);
         }
-		if (trainPOV) {
-			glm::vec3 trainFront = g_train->GetFrontPosition();
-			g_camera.setPosition(trainFront + glm::vec3(0.0f, 1.5f, 0.0f));
-			g_camera.ProcessMouseMovement(0.0f, 0.0f);
-		}
+        if (trainPOV) {
+            glm::vec3 trainFront = g_train->GetFrontPosition();
+            g_camera.setPosition(trainFront + glm::vec3(0.0f, 1.5f, 0.0f));
+            g_camera.ProcessMouseMovement(0.0f, 0.0f);
+        }
         // Update train with current speed
         g_train->Update(deltaTime, g_railway->GetPath());
 
@@ -336,17 +353,66 @@ int main() {
             light.Draw(lightShader);
         }
 
+        // Render ONLY lights to separate framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, lightOnlyFBO);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Render only the light sources
+        lightShader.Activate();
+        lightShader.setMat4("projection", g_projectionMatrix);
+        lightShader.setMat4("view", g_camera.GetViewMatrix());
+        for (auto& light : g_lights) {
+            lightShader.setVec3("lightColor", light.color);
+            light.Draw(lightShader);
+        }
+
+        // Ping-pong blur the lights
+        glDisable(GL_DEPTH_TEST);
+
+        bool horizontal = true;
+        bool first_iteration = true;
+        unsigned int amount = 100;
+
+        lightBlurShader.Activate();
+        glBindVertexArray(quadVAO);
+
+        for (unsigned int i = 0; i < amount; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            lightBlurShader.setBool("horizontal", horizontal);
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? lightOnlyTex : pingpongTex[!horizontal]);
+
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            horizontal = !horizontal;
+            if (first_iteration)
+                first_iteration = false;
+        }
+
         // STEP 2: Post-processing - render to screen
         // Gaussian Blur
+        glDisable(GL_DEPTH_TEST);
+        glBindVertexArray(quadVAO);
+        blurShader.Activate();
+
+        // First pass: horizontal blur to intermediate FBO
         glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        blurShader.Activate();
-        glBindVertexArray(quadVAO);
-        glDisable(GL_DEPTH_TEST);
-
+        blurShader.setBool("horizontal", true);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);  // input is original render
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Second pass: vertical blur to screen
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        blurShader.setBool("horizontal", false);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, intermediateTex);  // input is horizontally blurred
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Laplacian Edge Detection
@@ -359,6 +425,18 @@ int main() {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, intermediateTex);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Overlay blurred lights with additive blending
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE);
+
+        // Simple pass-through shader to render the blurred lights
+        lightBlurShader.Activate();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, pingpongTex[!horizontal]); // Final blurred lights
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glDisable(GL_BLEND);
 
         // Chromakey Overlay
         chromakeyingShader.Activate();
@@ -374,7 +452,8 @@ int main() {
             if (trainStopped) {
                 g_speedButton->SetColor(glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
                 g_speedButton->text = "CONTINUE";
-            } else {
+            }
+            else {
                 g_speedButton->SetColor(glm::vec4(0.2f, 0.8f, 0.2f, 0.8f)); // Green
                 g_speedButton->text = "STOP TRAIN";
             }
@@ -393,6 +472,10 @@ int main() {
     delete pickingShader;
     glDeleteFramebuffers(1, &pickingFBO);
     glDeleteTextures(1, &pickingTexture);
+    glDeleteFramebuffers(1, &lightOnlyFBO);
+    glDeleteTextures(1, &lightOnlyTex);
+    glDeleteFramebuffers(2, pingpongFBO);
+    glDeleteTextures(2, pingpongTex);
     delete g_railway;
     delete g_train;
     glfwDestroyWindow(g_window);
@@ -436,8 +519,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    g_windowWidth = width;
-    g_windowHeight = height;
+    SCR_WIDTH = width;
+    SCR_HEIGHT = height;
     glViewport(0, 0, width, height);
 }
 
