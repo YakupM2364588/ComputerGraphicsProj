@@ -8,7 +8,11 @@ Train::Train(const std::string& modelPath, const std::string& mtlPath)
     : model(modelPath, mtlPath) {
     model.SetScale(glm::vec3(0.07f));
 }
-
+float SafeAcos(float val) {
+    if (val < -1.0f) return acos(-1.0f);
+    if (val >  1.0f) return acos(1.0f);
+    return acos(val);
+}
 void Train::Update(float deltaTime, BezierCurvePath& path) {
     if (speed > 0.0f) {
         accumulatedTime += deltaTime;
@@ -22,41 +26,35 @@ void Train::Update(float deltaTime, BezierCurvePath& path) {
         float lookAheadDistance = 1.0f;
         float nextDist = std::min(dist + lookAheadDistance, totalLength);
         glm::vec3 nextPos = path.Evaluate(nextDist);
+        glm::vec3 tangent = glm::normalize(nextPos - trainPos);
 
-        glm::vec3 trainDirection = glm::normalize(nextPos - trainPos);
+        // Using angle formula: theta = acos((v1 DOT v2))
+        glm::vec3 tangentXZ = glm::vec3(tangent.x, 0.0f, tangent.z);
+        glm::vec3 zAxis = glm::vec3(0.0f, 0.0f, 1.0f);
 
-        if (glm::length(trainDirection) < 0.001f) {
-            trainDirection = glm::vec3(0.0f, 0.0f, 1.0f);
-        }
+        // Calculate yaw
+        float dotYaw = glm::dot(tangentXZ, zAxis);
+        float lenYaw  = glm::length(tangentXZ) * glm::length(zAxis);
+        float yaw = SafeAcos(dotYaw / lenYaw);
+        if (tangent.x < 0) yaw = -yaw;  // Preserve direction
 
-        float trainYaw = atan2(trainDirection.x, trainDirection.z);
-        float horizontalLength = sqrt(trainDirection.x * trainDirection.x + trainDirection.z * trainDirection.z);
-        float trainPitch = atan2(-trainDirection.y, horizontalLength);
+        // Calculate pitch
+        float dotPitch = glm::dot(tangent, tangentXZ);
+        float lenPitch = glm::length(tangent) * glm::length(tangentXZ);
+        float pitch = SafeAcos(dotPitch / lenPitch);
+        if (tangent.y < 0) pitch = -pitch;
 
-        float trainRoll = 0.0f;
-        if (dist > 2.0f && dist < totalLength - 2.0f) {
-            glm::vec3 leftPos = path.Evaluate(dist - 1.0f);
-            glm::vec3 rightPos = path.Evaluate(dist + 1.0f);
-
-            glm::vec3 bankingDirection = glm::cross(trainDirection, glm::vec3(0, 1, 0));
-            float bankingIntensity = glm::dot(bankingDirection, glm::normalize(rightPos - leftPos));
-
-            trainRoll = bankingIntensity * 0.15f;
-        }
-
-        glm::vec3 trainEulerRotation = glm::vec3(trainPitch, trainYaw, trainRoll);
-
-        glm::vec3 trackRight = glm::normalize(glm::cross(trainDirection, glm::vec3(0.0f, 1.0f, 0.0f)));
+        glm::vec3 trackRight = glm::normalize(glm::cross(tangent, glm::vec3(0.0f, 1.0f, 0.0f)));
         float lateralOffset = -1.3f;
 
         glm::vec3 adjustedTrainPos = trainPos + (trackRight * lateralOffset);
         adjustedTrainPos.y += 0.15f;
 
         model.SetPosition(adjustedTrainPos);
-        model.SetRotation(trainEulerRotation);
+        model.SetRotation(glm::vec3(pitch, yaw, 0));
 
         float frontOffset = 3.0f;
-        frontPosition = adjustedTrainPos + trainDirection * frontOffset;
+        frontPosition = adjustedTrainPos + tangent * frontOffset;
     }
 }
 

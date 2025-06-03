@@ -18,8 +18,8 @@ void main()
 {
   vec3 bentPos = vec3(
     aPos.x,
-    aPos.y + sin(aPos.x) * 0.5,
-    aPos.z + cos(aPos.x) * 0.5
+    aPos.y ,
+    aPos.z
     );
 
 

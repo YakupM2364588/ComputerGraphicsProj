@@ -288,13 +288,13 @@ int main() {
 
     g_lights = {
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-              {30.0f, 10.0f, 10.0f}, {1.0f, 0.0f, 0.0f}),
+              {-50.0f, 10.0f, 30.0f}, {1.0f, 0.0f, 0.0f}),
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-              {0.0f, 10.0f, 30.0f}, {0.0f, 1.0f, 0.0f}),
+              {50.0f, 10.0f, 30.0f}, {0.0f, 1.0f, 0.0f}),
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-              {-30.0f, 10.0f, -10.0f}, {0.0f, 0.0f, 1.0f}),
+              {-0.0f, 10.0f, 10.0f}, {0.0f, 0.0f, 1.0f}),
         Light(RESOURCE_PATH"models/sun.obj", RESOURCE_PATH"models",
-             {0.0f, 10.0f, -30.0f}, {1.0f, 0.9f, 0.0f}),
+             {0.0f, 10.0f, 80.0f}, {1.0f, 0.9f, 0.0f}),
     };
 
     Shader mainShader(RESOURCE_PATH"shaders/area.vert", RESOURCE_PATH"shaders/area.frag");

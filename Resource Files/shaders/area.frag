@@ -34,10 +34,7 @@ void main()
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 result = vec3(0.0);
 
-    vec3 texColor = texture(diffuse_texture, TexCoords).rgb;
 
-    //Check als texColor bestaat
-    vec3 finalColor = Color ;
 
     for(int i = 0; i < LIGHTS; i++)
     {
@@ -53,8 +50,8 @@ void main()
         lights[i].linear * distance +
         lights[i].quadratic * (distance * distance));
 
-        vec3 ambient  = lights[i].ambient * finalColor;
-        vec3 diffuse  = lights[i].diffuse * diff * finalColor;
+        vec3 ambient  = lights[i].ambient * Color;
+        vec3 diffuse  = lights[i].diffuse * diff * Color;
         vec3 specular = lights[i].specular * spec;
 
         diffuse  *= weakening;
