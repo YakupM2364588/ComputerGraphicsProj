@@ -23,23 +23,18 @@ void Railway::Draw(Shader& shader) {
         glm::vec3 tangent = glm::normalize(nextPos - pos);
 
         // Using angle formula: theta = acos((v1 DOT v2)/(|v1|*|v2|))
-        glm::vec3 tangentXZ = glm::vec3(tangent.x, 0.0f, tangent.z);
         glm::vec3 zAxis = glm::vec3(0.0f, 0.0f, 1.0f);
 
         // Calculate yaw
-        float dotYaw = glm::dot(tangentXZ, zAxis);
-        float lenYaw  = glm::length(tangentXZ) * glm::length(zAxis);
+        float dotYaw = glm::dot(tangent, zAxis);
+        float lenYaw  = glm::length(tangent) * glm::length(zAxis);
         float yaw = SafeAcos1(dotYaw / lenYaw);
         if (tangent.x < 0) yaw = -yaw;  // Preserve direction
 
         // Calculate pitch
-        float dotPitch = glm::dot(tangent, tangentXZ);
-        float lenPitch = glm::length(tangent) * glm::length(tangentXZ);
-        float pitch = SafeAcos1(dotPitch / lenPitch);
-        if (tangent.y < 0) pitch = -pitch;
 
         m_railPiece.SetPosition(pos);
-        m_railPiece.SetRotation(glm::vec3(pitch, yaw, 0));
+        m_railPiece.SetRotation(glm::vec3(0, yaw, 0));
         m_railPiece.Draw(shader);
     }
 }

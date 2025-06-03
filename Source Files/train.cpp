@@ -32,17 +32,13 @@ void Train::Update(float deltaTime, BezierCurvePath& path) {
         glm::vec3 tangentXZ = glm::vec3(tangent.x, 0.0f, tangent.z);
         glm::vec3 zAxis = glm::vec3(0.0f, 0.0f, 1.0f);
 
+
         // Calculate yaw
-        float dotYaw = glm::dot(tangentXZ, zAxis);
-        float lenYaw  = glm::length(tangentXZ) * glm::length(zAxis);
+        float dotYaw = glm::dot(tangent, zAxis);
+        float lenYaw  = glm::length(tangent) * glm::length(zAxis);
         float yaw = SafeAcos(dotYaw / lenYaw);
         if (tangent.x < 0) yaw = -yaw;  // Preserve direction
 
-        // Calculate pitch
-        float dotPitch = glm::dot(tangent, tangentXZ);
-        float lenPitch = glm::length(tangent) * glm::length(tangentXZ);
-        float pitch = SafeAcos(dotPitch / lenPitch);
-        if (tangent.y < 0) pitch = -pitch;
 
         glm::vec3 trackRight = glm::normalize(glm::cross(tangent, glm::vec3(0.0f, 1.0f, 0.0f)));
         float lateralOffset = -1.3f;
@@ -51,7 +47,7 @@ void Train::Update(float deltaTime, BezierCurvePath& path) {
         adjustedTrainPos.y += 0.15f;
 
         model.SetPosition(adjustedTrainPos);
-        model.SetRotation(glm::vec3(pitch, yaw, 0));
+        model.SetRotation(glm::vec3(0, yaw, 0));
 
         float frontOffset = 3.0f;
         frontPosition = adjustedTrainPos + tangent * frontOffset;
