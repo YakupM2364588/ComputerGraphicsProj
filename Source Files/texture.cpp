@@ -1,4 +1,3 @@
-// Texture.cpp
 #include "texture.h"
 #include <iostream>
 #define STB_IMAGE_IMPLEMENTATION //1 keer definen

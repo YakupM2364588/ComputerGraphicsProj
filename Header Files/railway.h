@@ -1,7 +1,3 @@
-//
-// Created by p0l on 5/26/25.
-//
-
 #ifndef RAILWAY_H
 #define RAILWAY_H
 #pragma once

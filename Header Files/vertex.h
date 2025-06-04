@@ -1,4 +1,3 @@
-// Created by p0l on 5/19/25.
 #ifndef VERTEX_H
 #define VERTEX_H
 
