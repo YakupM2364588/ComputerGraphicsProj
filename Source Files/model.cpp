@@ -1,18 +1,19 @@
-// Created by p0l on 5/19/25.
 #include "model.h"
-#include "glm/gtc/matrix_transform.hpp"
 #include "modelLoader.h"
 
+//Constructor voor model met alleen meshes
 Model::Model(const std::vector<Mesh>& meshes)
     : m_meshes(meshes)
 {
 }
 
+//Constructor voor model van file
 Model::Model(const std::string& filepath, const std::string& mtlBasePath)
 {
     *this = ModelLoader::LoadOBJ(filepath, mtlBasePath);
 }
 
+//Draw alle meshes
 void Model::Draw(const Shader& shader)
 {
     shader.setMat4("model", GetModelMatrix());

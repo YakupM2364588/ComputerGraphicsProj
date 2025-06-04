@@ -1,10 +1,5 @@
-//
-// Created by p0l on 5/26/25.
-//
-
 #ifndef TRAIN_H
 #define TRAIN_H
-#pragma once
 #include "model.h"
 #include "bezierCurvesPath.h"
 
@@ -19,7 +14,7 @@ public:
     float speed = 5.0f;
 
 private:
-    float accumulatedTime = 0.0f; //t 
+    float m_accumulatedTime = 0.0f; //t
     glm::vec3 frontPosition;
 };
 

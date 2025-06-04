@@ -1,17 +1,12 @@
 #include "mesh.h"
-#include <iostream>
 
+//Init de VBO, VAO, EBO
 Mesh::Mesh(const std::vector<Vertex>& vertices,
            const std::vector<unsigned int>& indices,
            const std::vector<Texture>& textures)
     : m_vertices(vertices), m_indices(indices), m_textures(textures),
       m_vertexBufferObject(nullptr,0), m_elementBufferObject(nullptr,0)
 {
-    if (vertices.empty() || indices.empty()) {
-        std::cerr << "Empty vertex or index buffer!" << std::endl;
-        return;
-    }
-
     m_vertexArrayObject.Bind();
 
     m_vertexBufferObject = VBO(m_vertices.data(), m_vertices.size() * sizeof(Vertex));
@@ -27,25 +22,14 @@ Mesh::Mesh(const std::vector<Vertex>& vertices,
     m_elementBufferObject.Unbind();
 }
 
+//Draw de vertices, in de VBO
 void Mesh::Draw(const Shader& shader) const
 {
     if (m_indices.empty()) {
-        std::cerr << "Empty mesh";
         return;
     }
-
-    for (auto & m_texture : m_textures) {
-        if (m_texture.m_type == "texture_diffuse")
-        {
-            m_texture.BindToShader(shader, "diffuse_texture", 0);
-            break;
-        }
-    }
-
     m_vertexArrayObject.Bind();
-    //Start van begin element buffer object
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, 0);
     m_vertexArrayObject.Unbind();
-
     glActiveTexture(GL_TEXTURE0);
 }

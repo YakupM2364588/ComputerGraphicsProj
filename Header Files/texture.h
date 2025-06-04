@@ -1,7 +1,3 @@
-//
-// Created by p0l on 5/19/25.
-//
-
 #ifndef TEXTURE_H
 #define TEXTURE_H
 #include <string>

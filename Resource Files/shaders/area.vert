@@ -16,14 +16,7 @@ uniform mat4 projection;
 
 void main()
 {
-  vec3 bentPos = vec3(
-    aPos.x,
-    aPos.y ,
-    aPos.z
-    );
-
-
-    FragPos = vec3(model * vec4(bentPos, 1.0));
+    FragPos = vec3(model * vec4(aPos, 1.0));
     Normal = mat3(transpose(inverse(model))) * aNormal;
     TexCoords = aTexCoords;
     Color = aColor;

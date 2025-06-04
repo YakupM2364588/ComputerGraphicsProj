@@ -1,12 +1,10 @@
 #include "../Header Files/button.h"
-#include <iostream>
 
-Button::Button(float x, float y, float width, float height,
-               const std::string& text, const glm::vec3& colorID)
-    : x(x), y(y), width(width), height(height), text(text),
+Button::Button(float x, float y, float width, float height, const glm::vec3& colorID)
+    : x(x), y(y), width(width), height(height),
       visible(true), isPressed(false), colorID(colorID),
       VAO(0), VBO(0), initialized(false),
-      currentColor(0.2f, 0.8f, 0.2f, 0.8f)
+      currentColor(0.0f, 0.0f, 1.0f, 0.0f)
 {
 }
 
@@ -44,12 +42,9 @@ void Button::Initialize() {
     initialized = true;
 }
 
+//Render de button op de normale screen
 void Button::Render(Shader& buttonShader, int windowWidth, int windowHeight) {
     if (!visible || !initialized) return;
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     buttonShader.Activate();
 
     glm::mat4 transform = GetTransformMatrix(windowWidth, windowHeight);
@@ -58,10 +53,9 @@ void Button::Render(Shader& buttonShader, int windowWidth, int windowHeight) {
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    glDisable(GL_BLEND);
 }
 
+//Render de button op de andere framebuffer object met de unqiue colorId
 void Button::RenderForPicking(Shader& pickingShader, int windowWidth, int windowHeight) {
     if (!visible || !initialized) return;
 
@@ -76,8 +70,9 @@ void Button::RenderForPicking(Shader& pickingShader, int windowWidth, int window
 }
 
 
+//Render de picking button met de unique kleur, check dan of het geklikte pixel die zelfde kleur heeft
 bool Button::HandleClick(double mouseX, double mouseY, int windowWidth, int windowHeight,
-                        GLuint pickingFBO, GLuint pickingTexture, Shader& pickingShader) {
+                        GLuint pickingFBO, Shader& pickingShader) {
     if (!visible) return false;
 
     double flippedY = windowHeight - mouseY;

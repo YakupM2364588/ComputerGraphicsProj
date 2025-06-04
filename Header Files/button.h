@@ -1,7 +1,3 @@
-//
-// Created by p0l on 5/27/25.
-//
-
 #ifndef BUTTON_H
 #define BUTTON_H
 
@@ -14,14 +10,12 @@
 class Button {
 public:
     float x, y, width, height;
-    std::string text;
     bool visible;
     bool isPressed;
 
     glm::vec3 colorID;
 
-    Button(float x = 50.0f, float y = 50.0f, float width = 150.0f, float height = 40.0f,
-           const std::string& text = "BUTTON", const glm::vec3& colorID = glm::vec3(1.0f, 1.0f, 1.0f));
+    Button(float x = 50.0f, float y = 50.0f, float width = 150.0f, float height = 40.0f, const glm::vec3& colorID = glm::vec3(1.0f, 1.0f, 1.0f));
 
     ~Button();
 
@@ -32,7 +26,7 @@ public:
     void RenderForPicking(Shader& pickingShader, int windowWidth, int windowHeight);
 
     bool HandleClick(double mouseX, double mouseY, int windowWidth, int windowHeight,
-                    GLuint pickingFBO, GLuint pickingTexture, Shader& pickingShader);
+                    GLuint pickingFBO, Shader& pickingShader);
 
     void SetColor(const glm::vec4& color);
 

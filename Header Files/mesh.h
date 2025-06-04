@@ -1,7 +1,3 @@
-//
-// Created by p0l on 5/19/25.
-//
-
 #ifndef MESH_H
 #define MESH_H
 #include <vector>
@@ -10,7 +6,7 @@
 #include "texture.h"
 #include "VAO.h"
 class Mesh {
-    public:
+public:
     Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>& indices, const std::vector<Texture>& textures);
     void Draw(const Shader &shader) const;
 

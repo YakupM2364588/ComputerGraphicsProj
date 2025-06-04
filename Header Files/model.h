@@ -1,4 +1,3 @@
-// Created by p0l on 5/19/25.
 #ifndef MODEL_H
 #define MODEL_H
 
@@ -6,8 +5,7 @@
 #include <string>
 #include "mesh.h"
 #include "shaderClass.h"
-#include "vertex.h"
-
+#include "glm/gtc/matrix_transform.hpp"
 class Model {
 public:
     Model(const std::vector<Mesh>& meshes);

@@ -227,7 +227,7 @@ int main() {
     buttonShader = new Shader(RESOURCE_PATH"shaders/button.vert", RESOURCE_PATH"shaders/button.frag");
 
     // Create button instance
-    g_speedButton = new Button(50.0f, 50.0f, 150.0f, 40.0f, "CONTINUE", glm::vec3(1.0f, 1.0f, 1.0f));
+    g_speedButton = new Button(50.0f, 50.0f, 150.0f, 40.0f, glm::vec3(1.0f, 1.0f, 1.0f));
     g_speedButton->Initialize();
     //------------------------------------------------------------------------------------------------
 
@@ -451,11 +451,9 @@ int main() {
             // Update button appearance based on train state
             if (trainStopped) {
                 g_speedButton->SetColor(glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
-                g_speedButton->text = "CONTINUE";
             }
             else {
                 g_speedButton->SetColor(glm::vec4(0.2f, 0.8f, 0.2f, 0.8f)); // Green
-                g_speedButton->text = "STOP TRAIN";
             }
             g_speedButton->Render(*buttonShader, SCR_WIDTH, SCR_HEIGHT);
         }
@@ -490,7 +488,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
         // Handle button click
         if (g_speedButton->HandleClick(xpos, ypos, SCR_WIDTH, SCR_HEIGHT,
-                                      pickingFBO, pickingTexture, *pickingShader)) {
+                                      pickingFBO, *pickingShader)) {
             // Button was clicked - toggle train state
             trainStopped = !trainStopped;
             g_train->speed = trainStopped ? 0.0f : normalSpeed;
@@ -537,7 +535,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;  // Reversed since y-coordinates go from bottom to top
+    float yoffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
