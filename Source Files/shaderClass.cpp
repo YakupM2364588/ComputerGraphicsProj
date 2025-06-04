@@ -2,7 +2,6 @@
 
 #include <cstring>
 
-// Converts textfile to string
 std::string fileToString(const char* filename)
 {
 	std::ifstream file(filename);
@@ -16,14 +15,13 @@ std::string fileToString(const char* filename)
 
 }
 
-// Build shader program
 Shader::Shader(const char* vertexShaderSourceFile, const char* fragmentShaderSourceFile)
 {
-	// Convert source files to string
+	// Convert files to string
 	std::string vertexCode = fileToString(vertexShaderSourceFile);
 	std::string fragmentCode = fileToString(fragmentShaderSourceFile);
 
-	// Convert strings into character arrays
+	// Convert source into character arrays
 	const char* vertexSource = vertexCode.c_str();
 	const char* fragmentSource = fragmentCode.c_str();
 
@@ -57,13 +55,12 @@ Shader::Shader(const char* vertexShaderSourceFile, const char* fragmentShaderSou
 
 }
 
-// Activates shader program
+// Activate shader program
 void Shader::Activate()
 {
 	glUseProgram(ID);
 }
 
-// utility uniform functions
 void Shader::setBool(const std::string& name, bool value) const
 {
 	glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value);
@@ -123,9 +120,4 @@ void Shader::setMat4(const std::string& name, const glm::mat4& mat) const
 	glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
 }
 
-// Destructor
-Shader::~Shader()
-{
-	glDeleteProgram(ID);
-}
 

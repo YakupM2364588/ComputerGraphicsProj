@@ -20,6 +20,5 @@ public:
 	void Bind() const;
 	// Unbinds the VAO
 	void Unbind() const;
-	// Deletes the VAO
-	void Delete();
+
 };
