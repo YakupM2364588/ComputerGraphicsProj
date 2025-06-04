@@ -3,17 +3,25 @@ project(opengl_project)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(OpenGL REQUIRED)
-find_package(glfw3 REQUIRED)
+link_directories(${CMAKE_SOURCE_DIR}/lib)
 
-# Create GLAD library and include its headers
-add_library(GLAD "Source Files/glad.c"
-        "Header Files/button.h"
-        "Source Files/button.cpp"
-)
-target_include_directories(GLAD PRIVATE
-        "${CMAKE_SOURCE_DIR}/includes"  # Path to "includes/glad"
-)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
+
+find_package(OpenGL REQUIRED)
+
+# find the required packages
+find_package(GLM REQUIRED)
+message(STATUS "GLM included at ${GLM_INCLUDE_DIR}")
+find_package(GLFW3 REQUIRED)
+message(STATUS "Found GLFW3 in ${GLFW3_INCLUDE_DIR}")
+
+set(LIBS glfw3 opengl32)
+
+add_library(GLAD "Source Files/glad.c")
+set(LIBS ${LIBS} GLAD)
+
+include_directories(${CMAKE_SOURCE_DIR}/includes)
+include_directories("${CMAKE_SOURCE_DIR}/Header Files")
 add_executable(opengl_project
         "Source Files/main.cpp"
         "Source Files/shaderClass.cpp"
@@ -30,18 +38,7 @@ add_executable(opengl_project
         "Source Files/texture.cpp"
         "Source Files/train.cpp"
         "Source Files/tiny_obj_loader.cpp"
+        "Source Files/button.cpp"
 )
-
-target_include_directories(opengl_project PRIVATE
-        "${CMAKE_SOURCE_DIR}/includes"
-        "${CMAKE_SOURCE_DIR}/Header Files"
-        ${GLFW3_INCLUDE_DIRS}
-        /usr/include
-)
-
-target_link_libraries(opengl_project
-        glfw
-        ${OPENGL_LIBRARIES}
-        GLAD  # Link GLAD library
-)
+target_link_libraries(opengl_project ${LIBS})
 target_compile_definitions(opengl_project PRIVATE RESOURCE_PATH="${CMAKE_SOURCE_DIR}/Resource Files/")

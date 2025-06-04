@@ -14,7 +14,6 @@ class Shader
 	public:
 		GLuint ID;
 		Shader(const char* vertexShaderSourceFile, const char* fragmentShaderSourceFile);
-		~Shader();
 		void Activate();
 		void setBool(const std::string& name, bool value) const;
 		void setInt(const std::string& name, int value) const;

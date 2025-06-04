@@ -14,6 +14,5 @@ public:
 	void Bind() const;
 	// Unbinds the EBO
 	void Unbind() const;
-	// Deletes the EBO
-	void Delete();
+
 };

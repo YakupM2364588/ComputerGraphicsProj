@@ -403,7 +403,7 @@ int main() {
 
         blurShader.setBool("horizontal", true);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texColorBuffer);  // input is original render
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Second pass: vertical blur to screen
@@ -412,7 +412,7 @@ int main() {
 
         blurShader.setBool("horizontal", false);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, intermediateTex);  // input is horizontally blurred
+        glBindTexture(GL_TEXTURE_2D, intermediateTex);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Laplacian Edge Detection
@@ -426,11 +426,11 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, intermediateTex);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // Overlay blurred lights with additive blending
+        // Overlay blurred lights with blending
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE);
 
-        // Simple pass-through shader to render the blurred lights
+        // Pass-through shader to render the blurred lights
         lightBlurShader.Activate();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, pingpongTex[!horizontal]); // Final blurred lights

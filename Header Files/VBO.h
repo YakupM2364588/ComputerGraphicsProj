@@ -14,6 +14,4 @@ public:
 	void Bind() const;
 	// Unbinds the VBO
 	void Unbind() const;
-	// Deletes the VBO
-	void Delete();
 };
