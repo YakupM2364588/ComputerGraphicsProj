@@ -319,7 +319,6 @@ int main() {
             g_camera.setPosition(trainFront + glm::vec3(0.0f, 1.5f, 0.0f));
             g_camera.ProcessMouseMovement(0.0f, 0.0f);
         }
-        // Update train with current speed
         g_train->Update(deltaTime, g_railway->GetPath());
 
         // STEP 1: Render scene to framebuffer
@@ -333,18 +332,16 @@ int main() {
         mainShader.setMat4("projection", g_projectionMatrix);
         mainShader.setMat4("view", g_camera.GetViewMatrix());
         mainShader.setVec3("viewPos", g_camera.getPosition());
-        mainShader.setFloat("shininess", 32.0f);
+        mainShader.setFloat("shininess", 30.0f);
 
-        // Configure lights
+        //Config lights
         for (size_t i = 0; i < g_lights.size(); ++i) {
             g_lights[i].ConfigureShader(mainShader, static_cast<int>(i));
         }
 
-        // Draw objects
         g_railway->Draw(mainShader);
         g_train->Draw(mainShader);
 
-        // Light sources
         lightShader.Activate();
         lightShader.setMat4("projection", g_projectionMatrix);
         lightShader.setMat4("view", g_camera.GetViewMatrix());
@@ -358,7 +355,7 @@ int main() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Render only the light sources
+        //Render lightsource
         lightShader.Activate();
         lightShader.setMat4("projection", g_projectionMatrix);
         lightShader.setMat4("view", g_camera.GetViewMatrix());
@@ -446,9 +443,7 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, borderTex);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
-        // Render button if visible
         if (g_speedButton && buttonVisible) {
-            // Update button appearance based on train state
             if (trainStopped) {
                 g_speedButton->SetColor(glm::vec4(0.8f, 0.2f, 0.2f, 0.8f)); // Red
             }
@@ -462,7 +457,6 @@ int main() {
         glfwPollEvents();
     }
 
-    // Cleanup
     if (g_speedButton) {
         delete g_speedButton;
     }
@@ -486,10 +480,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
 
-        // Handle button click
         if (g_speedButton->HandleClick(xpos, ypos, SCR_WIDTH, SCR_HEIGHT,
                                       pickingFBO, *pickingShader)) {
-            // Button was clicked - toggle train state
             trainStopped = !trainStopped;
             g_train->speed = trainStopped ? 0.0f : normalSpeed;
         }
